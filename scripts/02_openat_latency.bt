@@ -1,0 +1,24 @@
+#!/usr/bin/env bpftrace
+
+/*
+ * LEVEL 2 — MEASURE
+ * Measure the time between openat syscall entry and exit.
+ * hist() displays a logarithmic latency distribution in microseconds.
+ *
+ * Run:
+ *   sudo bpftrace scripts/02_openat_latency.bt
+ */
+
+tracepoint:syscalls:sys_enter_openat
+/comm == "ebpf_workload"/
+{
+    @start_ns[tid] = nsecs;
+}
+
+tracepoint:syscalls:sys_exit_openat
+/@start_ns[tid]/
+{
+    $duration_us = (nsecs - @start_ns[tid]) / 1000;
+    @openat_latency_us = hist($duration_us);
+    delete(@start_ns[tid]);
+}

@@ -1,0 +1,15 @@
+#!/usr/bin/env bpftrace
+
+/*
+ * LEVEL 1 — OBSERVE
+ * Count openat() syscall entries by process name.
+ *
+ * Run:
+ *   sudo bpftrace scripts/01_count_openat.bt
+ */
+
+tracepoint:syscalls:sys_enter_openat
+/comm == "ebpf_workload"/
+{
+    @openat_calls[comm] = count();
+}

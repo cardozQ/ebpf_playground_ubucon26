@@ -1,0 +1,38 @@
+#!/usr/bin/env bpftrace
+
+/*
+ * LEVEL 3 — INVESTIGATE
+ * Correlate each openat() entry with its exit:
+ *   - process name and PID
+ *   - requested pathname
+ *   - return value (fd on success, negative error on failure)
+ *   - syscall duration in microseconds
+ *
+ * Run:
+ *   sudo bpftrace scripts/03_openat_investigation.bt
+ */
+
+tracepoint:syscalls:sys_enter_openat
+/comm == "ebpf_workload"/
+{
+    @start_ns[tid] = nsecs;
+    @requested_path[tid] = str(args->filename);
+}
+
+tracepoint:syscalls:sys_exit_openat
+/@start_ns[tid]/
+{
+    $duration_us = (nsecs - @start_ns[tid]) / 1000;
+
+    printf("comm=%-16s pid=%-7d tid=%-7d file=%s ret=%d duration=%dus\n",
+           comm, pid, tid, @requested_path[tid], args->ret, $duration_us);
+
+    @openat_latency_us = hist($duration_us);
+
+    if (args->ret < 0) {
+        @openat_errors[comm] = count();
+    }
+
+    delete(@start_ns[tid]);
+    delete(@requested_path[tid]);
+}
